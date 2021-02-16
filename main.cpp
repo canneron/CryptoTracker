@@ -4,38 +4,66 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <fstream>
+#include <algorithm>
 #include "coin.h"
 
 using namespace std;
 
-string createNotification(Coin *array, int arrayLen) {
-  string coins = "";
+string userCoin, userCurrency, userCurrencySymbol;
+vector<Coin> coinList;
+
+void readSettings() {
+  string configOutput;
+  ifstream readConfig("settings.conf");
+  vector<string> settings;
+
+  while (getline(readConfig, configOutput)) {
+
+    if (configOutput.at(0) == '/') {
+      continue;
+    } else {
+      int pos = configOutput.find("=");
+      string varName = configOutput.substr(0, pos);
+      if (varName == "currency") {
+        userCurrency = configOutput.substr(configOutput.find("=") + 1);
+      }
+      else if (varName == "currency_symbol") {
+        userCurrencySymbol = configOutput.substr(configOutput.find("=") + 1);
+      }
+      else if (varName == "coins") {
+        userCoin = configOutput.substr(configOutput.find("=") + 1);
+        stringstream stringSplit(userCoin);
+        string temp;
+        while(getline(stringSplit, temp, ',')) {
+          coinList.push_back(Coin(temp));
+        }
+      }
+    }
+  }
+}
+string createNotification() {
   string coinNotification = "\n\n";
   string fileOutput;
-   for (int i=0; i < arrayLen; i++) {
-     coins.append(array[i].getName() + " ");
-   }
-   system(("sh getcoindata.sh " + coins).c_str());
-   for (int i=0; i < arrayLen; i++) {
-     ifstream coinFile(array[i].getName() + ".json");
+  readSettings();
+  replace(userCoin.begin(), userCoin.end(), ',', ' ');
+  system(("sh getcoindata.sh " + userCurrency + " " + userCoin).c_str());
+   for (int i=0; i < coinList.size(); i++) {
+     ifstream coinFile(coinList[i].getName() + ".json");
      while (getline(coinFile, fileOutput)) {
-       array[i].setPrice(fileOutput);
+       coinList[i].setPrice(fileOutput);
      }
-     coinNotification += "\n" + array[i].getName() + ":\t" + array[i].getPrice();
+     coinNotification += "\n" + coinList[i].getName() + ": " + userCurrencySymbol + coinList[i].getPrice();
      coinFile.close();
+     system(("rm " + coinList[i].getName() + ".json").c_str());
    }
    return coinNotification;
 }
 
 int main(int argc, char *argv[]) {
-  string pricesOutput, input, coinName, coinPrice, coinHistoricPrice, coinPercentageChange, coinNotify;
-  int arrLength = argc - 1;
-  Coin* coinList = new Coin[arrLength];
-  for (int i=1; i < argc; i++) {
-    coinList[i-1] = Coin(argv[i]);
-  }
-  coinNotify = createNotification(coinList, arrLength);
-  delete[] coinList;
+  string coinHistoricPrice, coinPercentageChange, coinNotify;
+
+  coinNotify = createNotification();
+
   auto Application = Gio::Application::create("Crypto Tracker", Gio::APPLICATION_FLAGS_NONE);
 	Application->register_application();
 	auto Notification = Gio::Notification::create("Current Prices");
