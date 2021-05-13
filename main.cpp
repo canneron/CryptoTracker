@@ -1,17 +1,22 @@
-#include <giomm-2.4/giomm.h>
 #include <string>
+#include <vector>
 #include <iostream>
+#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fstream>
 #include <algorithm>
 #include "coin.h"
+#include <libnotify/notify.h>
+#include <iostream>
 
 using namespace std;
-
+// parameters
 string userCoin, userCurrency, userCurrencySymbol;
 vector<Coin> coinList;
 
+// reads config file
+// coins to be listed can be changed in config file
 void readSettings() {
   string configOutput;
   ifstream readConfig("settings.conf");
@@ -60,17 +65,20 @@ string createNotification() {
 }
 
 int main(int argc, char *argv[]) {
-  string coinHistoricPrice, coinPercentageChange, coinNotify;
+  string coinNotify;
 
   coinNotify = createNotification();
 
-  auto Application = Gio::Application::create("Crypto Tracker", Gio::APPLICATION_FLAGS_NONE);
-	Application->register_application();
-	auto Notification = Gio::Notification::create("Current Prices");
-	Notification->set_body(coinNotify);
-	auto Icon = Gio::ThemedIcon::create("dialog-information");
-	Notification->set_icon (Icon);
-	Application->send_notification(Notification);
-	return 0;
+  notify_init("Crypto Tracker");
+  NotifyNotification* n = notify_notification_new ("Current Prices",
+                               (coinNotify).c_str(),
+                                0);
+  notify_notification_set_timeout(n, 20000); // 20 seconds
 
+  if (!notify_notification_show(n, 0))
+  {
+      std::cerr << "show has failed" << std::endl;
+      return -1;
+  }
+  return 0;
 }
